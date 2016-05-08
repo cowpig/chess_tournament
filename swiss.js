@@ -5,7 +5,13 @@ games = []
 
 games_by_round = []
 
+const get_standings = (players, games) => {
+	const table = get_table(players, games)
+	return table.map((player, record) => { return [player, score(record)] })
+}
+
 const get_record = (games, player) => {
+	// console.log(games, player)
 	let record = []
 	games.map((game) => {
 		if (game[0] == player) {
@@ -31,76 +37,144 @@ const get_record = (games, player) => {
 
 // returns a list of players' records, sorted by highest score
 const get_table = (players, games) => {
+	// console.log(players, games)
 	let records = players.map(function(player){
 		return [player, get_record(games, player)]
 	})
+	// console.log(records)
 	return records.sort((a,b) => {return score(b[1]) - score(a[1])})
 }
 
 const color_count = (record, color) => {
-	return record.reduce((total, game) => {return total + game[0] == color})
+	return record.reduce((total, game) => {return total + (game[0] === color)}, 0)
 }
 
 const color_diff = (record) => {
 	return color_count(record, "white") - color_count(record, "black")
 }
 
-const has_played_against = (player, record) => {
-	return record.reduce((seen_yet, game) => {return seen_yet || (game[1] == player)})
+const games_against = (player, record) => {
+	return record.reduce((total, game) => {return total + (game[1] === player)}, 0)
+}
+
+const colsum = (matrix, col) => {
+	return matrix.reduce((sum,row) => {return sum + row[col]}, 0)
+}
+
+const score = (record) => {
+	return colsum(record, 2)
+}
+
+const potential_opponents = (player, record, players_to_pair, max_games) => {
+	// get all players with the highest score who have not yet played more than max_games
+	// against the given player
+	max_games = max_games || 0
+
+	let potential_opps = {}
+	// console.log("finding matches")
+	for (let i=0; i<players_to_pair.length; i++) {
+		let [other_player, other_record] = players_to_pair[i]
+		// console.log("checking ", other_player)
+
+		if (games_against(player, other_record) > max_games) {
+			// console.log("already played--continuing")
+			continue
+		}
+
+		if (Object.keys(potential_opps).length != 0) {
+			if ( score(other_record) != score(some_value_of(potential_opps)[1]) ){
+				break
+			}
+		}
+
+		potential_opps[i] = [other_player, other_record]
+	}
+	if (Object.keys(potential_opps).length != 0){
+		return potential_opps
+	}
+	return potential_opponents(player, record, players_to_pair, max_games+1)
 }
 
 const next_round = (players, games) => {
+	games = games || []
+
 	// order players by score
-	const players_to_pair = get_table()
+	const players_to_pair = get_table(players, games)
+
 	let pairings = []
-	while (players_to_pair.length > 0) {
+	while (players_to_pair.length > 1) {
 		const [player, record] = players_to_pair.shift()
-		// get all players with the highest score who have not yet played 
-		// against the highest-ranked remaining player
-		let potential_opponents = {}
-		for (let i=1; i<players_to_pair.length; i++) {
-			let [other_player, other_record] = players_to_pair[i]
+		// console.log("pairing ", player)
 
-			if (has_played_against(next_player, other_record)) {
-				continue
-			}
-
-			if (Object.keys(potential_opponents).length != 0) {
-				if ( score(other_record) != score( some_value_of(potential_opponents)[1] ) {
-					break
-				}
-			}
-
-			potential_opponents[i] = [other_player, other_record]
-		}
+		const opps = potential_opponents(player, record, players_to_pair)
+		// console.log("potential_opps:\n", JSON.stringify(opps))
 		
 		// of potential opponents, find the one with the most complementary white-black record
 		const wb_diff = color_diff(record)
 		let best_diff = 9999999
 		let best_opp = null
-		for (let i in potential_opponents) {
-			const diff = Math.abs(color_diff(potential_opponents[i][1]) - wb_diff)
+		for (let i in opps) {
+			const diff = Math.abs(color_diff(opps[i][1]) - wb_diff)
+			// console.log(opps[i][0], " has diff ", diff)
 			if (diff < best_diff) {
 				best_diff = diff
 				best_opp = i
 			}
 		}
 
-		const chosen_player = players_to_pair.splice(best_opp, 1)
+		const chosen_player = players_to_pair.splice(best_opp, 1)[0]
+		// console.log("selecting ", chosen_player[0], " with diff ", best_diff)
 
 		// add them to the pairings, with the player who has played fewer blacks as black
-		if ()
+		if (wb_diff > color_diff(chosen_player[1])) {
+			pairings.push([chosen_player[0], player, "*"])
+		} else {
+			pairings.push([player, chosen_player[0], "*"])
+		}
 	}
+	if (players_to_pair.length) {
+		pairings.push([players_to_pair[0][0], null, "*"])
+	}
+
+	return pairings
 }
 
 const some_value_of = (obj) => {
 	return obj[Object.keys(obj)[0]]
 }
 
-const colsum = (matrix, col) => {
-	return matrix.reduce((a,b) => {return a[col] + b[col]})
+const assert = (condition, message) => {
+    if (!condition) {
+        throw message || "Assertion failed";
+    }
 }
 
-const score = (record) => {
-	return colsum(record, 2)
+const print_table = (table) => {
+	for (let [player, record] of table) {
+		console.log(player, JSON.stringify(record))
+	}
 }
+
+const print_scores = (table) => {
+	for (let [player, record] of table) {
+		console.log(player, score(record), color_diff(record))
+	}
+}
+
+const test = () => {
+	let test_players = ["a", "b", "c", "d", "e"]
+	let games = []
+
+	for (let i=1; i<16; i++){
+		for (let game of games) {
+			game[2] = "1-0"
+		}
+		games = games.concat(next_round(test_players, games))
+		console.log("\n\n==round ", i, "==\npairings: ", games, "\n")
+		console.log("table: ")
+		print_scores(get_table(test_players, games))
+	}
+}
+
+// test()
+

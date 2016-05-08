@@ -69,21 +69,13 @@ var updateStatus = function() {
     moveColor = 'Black';
   }
 
-  // checkmate?
   if (game.in_checkmate() === true) {
     status = 'Game over, ' + moveColor + ' is in checkmate.';
-  }
-
-  // draw?
-  else if (game.in_draw() === true) {
+  } else if (game.in_draw() === true) {
     status = 'Game over, drawn position';
-  }
-
-  // game still on
-  else {
+  } else {
     status = moveColor + ' to move';
 
-    // check?
     if (game.in_check() === true) {
       status += ', ' + moveColor + ' is in check';
     }
