@@ -1,0 +1,9 @@
+{
+  "name": "chess_mockup",
+  "version": "1.0.0",
+  "main": "app.js",
+  "dependencies": {
+    "chess.js": "^0.1.0",
+    "express": "~4.9.0"
+  }
+}
