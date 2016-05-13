@@ -176,7 +176,8 @@ var robot_get = function(req, res) {
 
 var robot_post_move = function(game_id, move, res) {
 	var game = games[game_id];
-	if (game.chess.turn() !== game.player_color) {
+	var color = game.colors.game_id;
+	if (game.chess.turn() !== color) {
 		res.send("Not your turn.");
 	} else {
 		var move_res = register_move(game_id, move);
