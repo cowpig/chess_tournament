@@ -4,7 +4,7 @@ var app = express();
 var http = require('http').Server(app);
 var io = require('socket.io')(http);
 
-// var swiss = require('./swiss.js')
+var swiss = require('./swiss.js')
 
 console.log(io);
 
@@ -62,12 +62,14 @@ var tickClock = function(id, intervalId) {
 		} else if (game.chess.in_draw() === true) {
 			game.result = '1/2-1/2';
 		} else {
-			game.clock[game.chess.turn()] -= 1;
+			if (game.result === '*')
+				game.clock[game.chess.turn()] -= 1;
 			if (game.clock[game.chess.turn()] < 1) {
 				game.result = game.chess.turn === 'b' ? '1-0' : '0-1';
 			}
 		}
 
+		// if (game.clock[game.chess.turn()] % 20 == 0)
 		broadcast_state(id);
 
 		if (game.result !== '*') {
@@ -82,11 +84,10 @@ var broadcast_state = function(id) {
 	// console.log("broadcasting", id, "to", id1, id2);
 	// console.log(clients);
 	if (id1 in clients) {
-		// console.log("id1 there");
-		clients[id1][1].emit('game_state', get_game_state(id));
+		clients[id1][1].emit('game_state', get_game_state(id1));
 	}
 	if (id2 in clients) {
-		clients[id2][1].emit('game_state', get_game_state(id));
+		clients[id2][1].emit('game_state', get_game_state(id2));
 	}
 }
 
@@ -155,76 +156,122 @@ app.get('/pieces/:fn', function(req, res) {
 	res.sendFile(fn, {root:'./pieces/'});
 });
 
-app.route('/robot/:user/:id')
-	.get(function(req, res) {
-		var id = req.params.id;
-		var user = req.params.user;
-		var game_id = user + "/" + id;
+var robot_get = function(req, res) {
+	var id = req.params.id;
+	var user = req.params.user;
+	var game_id = user + "/" + id;
 
-		if (!(game_id in games)) {
-			console.log("new game requested");
-			games[game_id] = new_game();
-			if (games[game_id].player_color === 'b') {
-				make_random_move(game_id)();
-			}
-			
+	if (!(game_id in games)) {
+		console.log("new game requested");
+		games[game_id] = new_game([game_id, "test"]);
+		if (games[game_id].player_color === 'b') {
+			make_random_move(game_id)();
+		}			
 
-			// console.log(games[game_id]);
-		}
+		// console.log(games[game_id]);
+	}
 
-		res.send(get_game_state(game_id));
-	})
-	.post(function(req, res) {
-		var id = req.params.id;
-		var user = req.params.user;
-		var game_id = user + "/" + id;
-		var game = games[game_id];
+	res.send(get_game_state(game_id));
+}
 
-		// console.log(game);
-
-		var move = req.query.move;
-
-		try {
-			move = {
-				from: move.slice(0,2),
-				to: move.slice(2,4)
-			}
-		} catch (err) {
-			console.log(err);
-		}
-
-		console.log(move, "posted to", game_id);
-		console.log(game.chess.turn(), game.player_color);
-
-		if (game.chess.turn() !== game.player_color) {
-			res.send("Not your turn.");
+var robot_post_move = function(game_id, move, res) {
+	var game = games[game_id];
+	if (game.chess.turn() !== game.player_color) {
+		res.send("Not your turn.");
+	} else {
+		var move_res = register_move(game_id, move);
+		if (move_res === null) {
+			res.send("Invalid move.");
 		} else {
-			var move_res = register_move(game_id, move);
-			if (move_res === null) {
-				res.send("Invalid move.");
-			} else {
-				res.send(move_res);
-				// setTimeout(make_random_move(game_id), 5000);
-			}
+			res.send(move_res);
+			// setTimeout(make_random_move(game_id), 5000);
 		}
-	});
+	}
+}
+
+var robot_post_san = function(req, res) {
+	var id = req.params.id;
+	var user = req.params.user;
+	var game_id = user + "/" + id;
+	var game = games[game_id];
+
+	// console.log(game);
+
+	var move = req.query.move;
+
+	robot_most_move(game_id, move, res);
+	console.log(move, "posted to", game_id);
+	console.log(game.chess.turn(), game.player_color);
+}
+var robot_post_sqs = function(req, res) {
+	var id = req.params.id;
+	var user = req.params.user;
+	var game_id = user + "/" + id;
+	var game = games[game_id];
+
+	try {
+		move = {
+			from: move.slice(0,2),
+			to: move.slice(2,4)
+		}
+	} catch (err) {
+		console.log(err);
+	}
+
+	var move = req.query.move;
+
+	robot_most_move(game_id, move, res);
+	console.log(move, "posted to", game_id);
+	console.log(game.chess.turn(), game.player_color);
+}
+
+app.route('/robot/:user/:id')
+	.get(robot_get)
+	.post(robot_post_sqs);
+
+app.route('/robot_san/:user/:id')
+	.get(robot_get)
+	.post(robot_post_san);
+
+
+var test_players = ["foo", "foo2", "foo3", "foo4"];
+var games_list = [];
+var next_games = [];
+var round = 1;
+
+var setup_next_round = function() {
+	for (var i=0; i<next_games.length; i++){
+		var id = '' + next_games[i][0] + "/" + (round-1);
+		console.log(games);
+		console.log(id);
+		next_games[i][2] = games[id].result;
+
+		games_list.push(next_games[i]);
+	}
+	console.log("SCORE SO FAR");
+	// console.log(games_list);
+	console.log(swiss.get_standings(test_players, games_list));
+
+	next_games = swiss.next_round(test_players, games_list);
+	console.log("ROUND", round, "PAIRINGS:");
+	
+	
+	for (var i=0; i<next_games.length; i++){
+		console.log(next_games[i]);
+		var id1 = '' + next_games[i][0] + "/" + round;
+		var id2 = '' + next_games[i][1] + "/" + round;
+		new_game([id1, id2]);
+	}
+
+	round += 1;
+}
 
 http.listen(3000, function () {
-	// console.log(swiss)
-	// var t = swiss.Swiss();
-	// console.log(t);
+	setup_next_round()
+	setInterval(setup_next_round, 15 * 60 * 1000);
 
-	// var test_players = ["foo", "foo2", "foo3", "foo4"];
-
-	// var games_list = []
-
-	// var round = next_round(test_players, games_list);
-	// for (var i=0; i<round.length; i++){
-	// 	console.log(round[i]);
-	// }
-
-	new_game(['foo/bar', 'foo2/bar']);
-	console.log(games);
+	// new_game(['foo/bar', 'foo2/bar']);
+	// console.log(games);
 	// console.log(games_list);
 	console.log('This aint draughts');
 });

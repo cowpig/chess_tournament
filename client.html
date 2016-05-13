@@ -36,18 +36,22 @@ var board,
   socket = io('http://localhost:3000'); 
 
 socket.on('game_state', function (data) {
-  // console.log(data);
+  console.log(data);
   data = JSON.parse(data);
   color = data.color;
   if (game.fen() != data.fen) {
     // console.log(game.fen());
     // console.log(data.fen);
     game.load(data.fen);
-    setBoard(game.fen());
+    board.position(game.fen());
     updateStatus();
   }
-  if ((board.orientation() === 'white' && color !== 'w') ||
-  (board.orientation() === 'black' && color !== 'b')){
+  var color_match = {
+    white: 'w',
+    black: 'b'
+  }
+  console.log(board.orientation());
+  if (color_match[board.orientation()] !== color) {
     board.flip();
   }
   setClock(data.clock);
@@ -57,8 +61,9 @@ socket.on('game_state', function (data) {
 // only pick up pieces for the side to move
 var onDragStart = function(source, piece, position, orientation) {
   if (game.game_over() === true ||
-      (game.turn() === 'w' && piece.search(/^b/) !== -1 && color === 'w') ||
-      (game.turn() === 'b' && piece.search(/^w/) !== -1) && color === 'b') {
+      (game.turn() !== color) ||
+      (game.turn() === 'w' && piece.search(/^b/) !== -1) ||
+      (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
     return false;
   }
 };
@@ -139,7 +144,6 @@ var setBoard = function(position) {
   var pos = position || "start";
   var cfg = {
     draggable: true,
-    position: 'start',
     onDragStart: onDragStart,
     onDrop: onDrop,
     onSnapEnd: onSnapEnd,

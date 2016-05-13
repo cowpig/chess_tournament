@@ -1,13 +1,15 @@
-players = []
+// players = []
 
-// ["white_name", "black_name", "1-0"] draw is "1/2-1/2", ongoing is "*"
-games = []
+// // ["white_name", "black_name", "1-0"] draw is "1/2-1/2", ongoing is "*"
+// games = []
 
-games_by_round = []
+// games_by_round = []
+
+// const Swiss = {
 
 const get_standings = (players, games) => {
 	const table = get_table(players, games)
-	return table.map((player, record) => { return [player, score(record)] })
+	return table.map(([player, record]) => { return [player, score(record)] })
 }
 
 const get_record = (games, player) => {
@@ -145,7 +147,7 @@ const some_value_of = (obj) => {
 
 const assert = (condition, message) => {
     if (!condition) {
-        throw message || "Assertion failed";
+        throw message || "Assertion failed"
     }
 }
 
@@ -176,5 +178,25 @@ const test = () => {
 	}
 }
 
-// test()
+module.exports = {
+	get_standings : get_standings,
+	get_record : get_record,
+	get_table : get_table,
+	color_count : color_count,
+	color_diff : color_diff,
+	games_against : games_against,
+	colsum : colsum,
+	score : score,
+	potential_opponents : potential_opponents,
+	next_round : next_round,
+	some_value_of : some_value_of,
+	assert : assert,
+	print_table : print_table,
+	print_scores : print_scores,
+	test : test
+}
 
+// }
+
+// if (typeof exports !== 'undefined') exports.Swiss = Swiss;
+// if (typeof define !== 'undefined') define( function () { return Swiss;  });
