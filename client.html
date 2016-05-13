@@ -8,9 +8,6 @@
   <link rel="stylesheet" href="/client_deps/chessboard.css" />
 </head>
 <body>
-<div style="text-align: center; width:400px">
-  <p id="opponent_name"> You are playing against </p>
-</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.9.4/chess.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.0.0-beta1/jquery.min.js"></script>
 <script src="/client_deps/chessboard.js"></script>
@@ -18,8 +15,8 @@
 
 
 <div id="clock_wrapper" style="width: 400px; height:50px; text-align:center; border:2px solid black; font-size: 0;">
-	<div id="black_clock" style="width: 200px; float:right; background-color:black; color: white; height:50px; font-size:44px;">0:00</div>
-	<div id="white_clock" style="width: 200px; height:50px; float:left; font-size:44px;">0:00</div>
+	<div id="black_clock" style="width: 200px; float:right; background-color:black; color: white; height:50px; font-size:44px;">0</div>
+	<div id="white_clock" style="width: 200px; height:50px; float:left; font-size:44px;">0</div>
 </div>
 <p />
 <div id="board" style="width: 400px"></div>
@@ -33,16 +30,18 @@ var board,
   statusEl = $('#status'),
   fenEl = $('#fen'),
   pgnEl = $('#pgn'),
+  wClockEl = $('#white_clock'),
+  bClockEl = $('#black_clock'),
   color = 'w',
   socket = io('http://localhost:3000'); 
 
 socket.on('game_state', function (data) {
-  console.log(data);
+  // console.log(data);
   data = JSON.parse(data);
   color = data.color;
   if (game.fen() != data.fen) {
-    console.log(game.fen());
-    console.log(data.fen);
+    // console.log(game.fen());
+    // console.log(data.fen);
     game.load(data.fen);
     setBoard(game.fen());
     updateStatus();
@@ -123,7 +122,17 @@ var updateStatus = function() {
 };
 
 var setClock = function(clock_state){
-
+  // console.log(clock_state);
+  var fstr = function(s) {
+    var mins = Math.floor(s / 60.);
+    var secs = '' + s % 60;
+    if (secs.length === 1){
+      secs = '0' + secs;
+    }
+    return mins + ":" + secs;
+  }
+  wClockEl.html(fstr(clock_state.w));
+  bClockEl.html(fstr(clock_state.b));
 }
 
 var setBoard = function(position) {

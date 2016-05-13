@@ -4,6 +4,8 @@ var app = express();
 var http = require('http').Server(app);
 var io = require('socket.io')(http);
 
+// var swiss = require('./swiss.js')
+
 console.log(io);
 
 games = {}
@@ -33,11 +35,14 @@ var new_game = function(user_ids) {
 	};
 	games[user_ids[0]] = game;
 	games[user_ids[1]] = game;
+
+	var intervalId = setInterval(tickClock(user_ids[0], intervalId), 1000);
+	
 	return game;
 }
 
 var get_game_state = function(id) {
-	console.log("getting game ", id);
+	// console.log("getting game ", id);
 	return JSON.stringify({
 		clock: games[id].clock,
 		pgn: games[id].chess.pgn(),
@@ -57,11 +62,13 @@ var tickClock = function(id, intervalId) {
 		} else if (game.chess.in_draw() === true) {
 			game.result = '1/2-1/2';
 		} else {
-			game.clock[game.chess.turn()] -= 0.1;
+			game.clock[game.chess.turn()] -= 1;
 			if (game.clock[game.chess.turn()] < 1) {
 				game.result = game.chess.turn === 'b' ? '1-0' : '0-1';
 			}
 		}
+
+		broadcast_state(id);
 
 		if (game.result !== '*') {
 			clearInterval(intervalId);
@@ -70,13 +77,16 @@ var tickClock = function(id, intervalId) {
 }
 
 var broadcast_state = function(id) {
-	var id1 = games[id][colors]['w'];
-	var id2 = games[id][colors]['b'];
+	var id1 = games[id]['colors']['w'];
+	var id2 = games[id]['colors']['b'];
+	// console.log("broadcasting", id, "to", id1, id2);
+	// console.log(clients);
 	if (id1 in clients) {
-		clients[id1][1].emit('game_id', get_game_state(id));
+		// console.log("id1 there");
+		clients[id1][1].emit('game_state', get_game_state(id));
 	}
 	if (id2 in clients) {
-		clients[id1][1].emit('game_id', get_game_state(id));
+		clients[id2][1].emit('game_state', get_game_state(id));
 	}
 }
 
@@ -100,14 +110,15 @@ var make_random_move = function(id) {
 io.on('connection', function(socket){
   console.log('a user connected');
   socket.on('update', function(msg) {
-  	clients[msg.id] = ['socket.id', socket];
-  	clients[socket.id] = ['msg.id', socket];
+  	clients[msg.id] = [socket.id, socket];
+  	clients[socket.id] = [msg.id, socket];
   	io.emit('game_state', get_game_state(msg.id));
+  	console.log("registered", socket.id, "to game", msg.id);
   })
   socket.on('move', function(move_msg){
   	console.log("move registered", move_msg, "socket", socket.id);
     var game = games[socket.id];
-    make_move(move_msg.id, move_msg.san);
+    register_move(move_msg.id, move_msg.san);
     io.emit('game_state', get_game_state(move_msg.id));
   });
   socket.on('disconnect', function(){
@@ -156,7 +167,7 @@ app.route('/robot/:user/:id')
 			if (games[game_id].player_color === 'b') {
 				make_random_move(game_id)();
 			}
-			var intervalId = setInterval(tickClock(game_id, intervalId), 100);
+			
 
 			// console.log(games[game_id]);
 		}
@@ -173,6 +184,15 @@ app.route('/robot/:user/:id')
 
 		var move = req.query.move;
 
+		try {
+			move = {
+				from: move.slice(0,2),
+				to: move.slice(2,4)
+			}
+		} catch (err) {
+			console.log(err);
+		}
+
 		console.log(move, "posted to", game_id);
 		console.log(game.chess.turn(), game.player_color);
 
@@ -184,13 +204,27 @@ app.route('/robot/:user/:id')
 				res.send("Invalid move.");
 			} else {
 				res.send(move_res);
-				setTimeout(make_random_move(game_id), 5000);
+				// setTimeout(make_random_move(game_id), 5000);
 			}
 		}
 	});
 
 http.listen(3000, function () {
+	// console.log(swiss)
+	// var t = swiss.Swiss();
+	// console.log(t);
+
+	// var test_players = ["foo", "foo2", "foo3", "foo4"];
+
+	// var games_list = []
+
+	// var round = next_round(test_players, games_list);
+	// for (var i=0; i<round.length; i++){
+	// 	console.log(round[i]);
+	// }
+
 	new_game(['foo/bar', 'foo2/bar']);
 	console.log(games);
+	// console.log(games_list);
 	console.log('This aint draughts');
 });
