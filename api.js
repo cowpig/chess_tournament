@@ -7,17 +7,33 @@ var io = require('socket.io')(http);
 console.log(io);
 
 games = {}
+clients = {}
 
-var new_game = function() { 
-	return {
+var new_game = function(user_ids) {
+	var colors; 
+	if (Math.random() > 0.5) {
+		colors = {
+			w: user_ids[0],
+			b: user_ids[1]
+		}
+	} else {
+		colors = {
+			b: user_ids[0],
+			w: user_ids[1]
+		}
+	}
+	var game = {
 		clock: {
 			w: 300,
 			b: 300
 		},
 		chess: new chess.Chess(),
 		result: '*',
-		player_color: Math.random() > 0.5 ? 'w' : 'b'
+		colors: colors
 	};
+	games[user_ids[0]] = game;
+	games[user_ids[1]] = game;
+	return game;
 }
 
 var get_game_state = function(id) {
@@ -28,7 +44,7 @@ var get_game_state = function(id) {
 		fen: games[id].chess.fen(),
 		turn: games[id].result === '*' ? games[id].chess.turn() : null,
 		result: games[id].result,
-		color: games[id].player_color
+		color: games[id].colors.w === id ? 'w' : 'b'
 	});
 }
 
@@ -53,6 +69,26 @@ var tickClock = function(id, intervalId) {
 	}
 }
 
+var broadcast_state = function(id) {
+	var id1 = games[id][colors]['w'];
+	var id2 = games[id][colors]['b'];
+	if (id1 in clients) {
+		clients[id1][1].emit('game_id', get_game_state(id));
+	}
+	if (id2 in clients) {
+		clients[id1][1].emit('game_id', get_game_state(id));
+	}
+}
+
+var register_move = function(id, move) {
+	var game = games[id];
+	var result = game.chess.move(move);
+	if (result !== null) {
+		broadcast_state(id);
+	}
+	return result;
+}
+
 var make_random_move = function(id) {
 	return function() {
 		var game = games[id].chess;
@@ -63,12 +99,24 @@ var make_random_move = function(id) {
 
 io.on('connection', function(socket){
   console.log('a user connected');
-  socket.on('move', function(msg){
-  	console.log("move registered", msg, "on socket", socket);
-    io.emit('reply', get_game_state());
+  socket.on('update', function(msg) {
+  	clients[msg.id] = ['socket.id', socket];
+  	clients[socket.id] = ['msg.id', socket];
+  	io.emit('game_state', get_game_state(msg.id));
+  })
+  socket.on('move', function(move_msg){
+  	console.log("move registered", move_msg, "socket", socket.id);
+    var game = games[socket.id];
+    make_move(move_msg.id, move_msg.san);
+    io.emit('game_state', get_game_state(move_msg.id));
   });
   socket.on('disconnect', function(){
-    console.log('user disconnected');
+    console.log('user', socket.id, 'disconnected');
+    if (socket.id in clients) {
+	    var game_id = clients[socket.id][0];
+	    delete clients[game_id];
+	    delete clients[socket.id];
+    }
   });
 });
 
@@ -121,7 +169,7 @@ app.route('/robot/:user/:id')
 		var game_id = user + "/" + id;
 		var game = games[game_id];
 
-		console.log(game);
+		// console.log(game);
 
 		var move = req.query.move;
 
@@ -131,7 +179,7 @@ app.route('/robot/:user/:id')
 		if (game.chess.turn() !== game.player_color) {
 			res.send("Not your turn.");
 		} else {
-			var move_res = game.chess.move(move);
+			var move_res = register_move(game_id, move);
 			if (move_res === null) {
 				res.send("Invalid move.");
 			} else {
@@ -142,6 +190,7 @@ app.route('/robot/:user/:id')
 	});
 
 http.listen(3000, function () {
-	games["foo/bar"] = 
+	new_game(['foo/bar', 'foo2/bar']);
+	console.log(games);
 	console.log('This aint draughts');
 });
