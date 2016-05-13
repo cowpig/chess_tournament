@@ -208,6 +208,7 @@ var robot_post_sqs = function(req, res) {
 	var user = req.params.user;
 	var game_id = user + "/" + id;
 	var game = games[game_id];
+	var move = req.query.move;
 
 	try {
 		move = {
