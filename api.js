@@ -219,8 +219,6 @@ var robot_post_sqs = function(req, res) {
 		console.log(err);
 	}
 
-	var move = req.query.move;
-
 	robot_post_move(game_id, move, res);
 	console.log(move, "posted to", game_id);
 	console.log(game.chess.turn(), game.player_color);
