@@ -13,16 +13,20 @@ clients = {}
 
 var new_game = function(user_ids) {
 	var colors; 
-	if (Math.random() > 0.5) {
-		colors = {
-			w: user_ids[0],
-			b: user_ids[1]
-		}
-	} else {
-		colors = {
-			b: user_ids[0],
-			w: user_ids[1]
-		}
+	// if (Math.random() > 0.5) {
+	// 	colors = {
+	// 		w: user_ids[0],
+	// 		b: user_ids[1]
+	// 	}
+	// } else {
+	// 	colors = {
+	// 		b: user_ids[0],
+	// 		w: user_ids[1]
+	// 	}
+	// }
+	colors = {
+		w: user_ids[0],
+		b: user_ids[1]
 	}
 	var game = {
 		clock: {
@@ -43,13 +47,18 @@ var new_game = function(user_ids) {
 
 var get_game_state = function(id) {
 	// console.log("getting game ", id);
+	var players = {
+		w: games[id].colors.w.split("/")[0],
+		b: games[id].colors.b.split("/")[0]
+	}
 	return JSON.stringify({
 		clock: games[id].clock,
 		pgn: games[id].chess.pgn(),
 		fen: games[id].chess.fen(),
 		turn: games[id].result === '*' ? games[id].chess.turn() : null,
 		result: games[id].result,
-		color: games[id].colors.w === id ? 'w' : 'b'
+		color: games[id].colors.w === id ? 'w' : 'b',
+		players: players
 	});
 }
 
@@ -176,8 +185,8 @@ var robot_get = function(req, res) {
 
 var robot_post_move = function(game_id, move, res) {
 	var game = games[game_id];
-	var color = game.colors.game_id;
-	if (game.chess.turn() !== color) {
+
+	if (game.colors[game.chess.turn()] !== game_id) {
 		res.send("Not your turn.");
 	} else {
 		var move_res = register_move(game_id, move);
@@ -233,23 +242,48 @@ app.route('/robot_san/:user/:id')
 	.get(robot_get)
 	.post(robot_post_san);
 
+[ [ 'cowpig', 2 ],
+  [ 'danish_gambit', 2 ],
+  [ 'chessy_mcchessface', 1 ],
+  [ 'bestie', 1 ] ]
 
-var test_players = ["foo", "foo2", "foo3", "foo4"];
-var games_list = [];
-var next_games = [];
-var round = 1;
+
+var test_players = ["cowpig", "chessy_mcchessface", "danish_gambit", "bestie"];
+var games_list = [
+	["cowpig", "chessy_mcchessface", "1-0"],
+	["danish_gambit", "bestie", "1-0"],
+	["danish_gambit", "cowpig", "0-1"],
+	["chessy_mcchessface", "bestie", "1-0"],
+	["bestie", "cowpig", "0-1"],
+	["chessy_mcchessface", "danish_gambit", "0-1"],
+	["cowpig", "danish_gambit", "1-0"],
+	["bestie", "chessy_mcchessface", "1-0"],
+	['cowpig', 'chessy_mcchessface', '1-0' ],
+	['danish_gambit', 'bestie', '1-0'],
+	['bestie', 'danish_gambit', '0-1'],
+
+];
+var next_games = [
+
+];
+
+var round = 5;
 
 var setup_next_round = function() {
 	for (var i=0; i<next_games.length; i++){
-		var id = '' + next_games[i][0] + "/" + (round-1);
-		console.log(games);
-		console.log(id);
-		next_games[i][2] = games[id].result;
+		if (next_games[i][2] !== "*") {
+			var id = '' + next_games[i][0] + "/" + (round-1);
+			console.log(games);
+			console.log(id);
+			next_games[i][2] = games[id].result;
 
-		games_list.push(next_games[i]);
+			games_list.push(next_games[i]);
+		}
 	}
 	console.log("SCORE SO FAR");
-	// console.log(games_list);
+	console.log(games_list);
+
+	console.log("STANDINGS:");
 	console.log(swiss.get_standings(test_players, games_list));
 
 	next_games = swiss.next_round(test_players, games_list);
@@ -260,15 +294,16 @@ var setup_next_round = function() {
 		console.log(next_games[i]);
 		var id1 = '' + next_games[i][0] + "/" + round;
 		var id2 = '' + next_games[i][1] + "/" + round;
-		new_game([id1, id2]);
+		// new_game([id1, id2]);
 	}
 
 	round += 1;
 }
 
 http.listen(3000, function () {
-	setup_next_round()
-	setInterval(setup_next_round, 15 * 60 * 1000);
+	// setup_next_round();
+
+	new_game(["white/1", "black/1"]);
 
 	// new_game(['foo/bar', 'foo2/bar']);
 	// console.log(games);
